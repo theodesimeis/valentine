@@ -36,29 +36,32 @@
     h1{ margin:16px 0 6px; font-size:28px; }
     p{ margin:0 0 18px; opacity:.85; }
     .buttons{
-      display:flex; gap:14px; justify-content:center; align-items:center;
       margin-top:10px;
       position:relative;
-      height:70px;
+      height:84px; /* zone où le NON peut bouger */
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:14px;
     }
     button{
-      border:0; cursor:pointer; padding:14px 22px; border-radius:14px;
-      font-size:18px; font-weight:800;
-      user-select:none;
+      border:0; cursor:pointer; border-radius:14px;
+      font-weight:900; user-select:none;
+      -webkit-tap-highlight-color: transparent;
     }
     #yes{
       background:#ff2d6f; color:white;
       box-shadow: 0 10px 20px rgba(255,45,111,.25);
-      font-size:22px;
-      padding:16px 28px;
+      font-size:22px; padding:16px 28px;
+      position:relative; z-index:3;
     }
     #no{
       background:#f1f1f1; color:#444;
-      position:absolute;
-      font-size:14px;
-      padding:10px 14px;
-      left:60%;
-      top:15px;
+      font-size:14px; padding:10px 14px;
+      position:absolute; /* on le place dans la zone .buttons */
+      left: calc(50% + 120px);
+      top: 22px;
+      z-index:2;
     }
     #message{
       margin-top:16px;
@@ -67,33 +70,34 @@
       display:none;
     }
 
-    /* coeurs */
+    /* Hearts fullscreen */
     .heart{
       position:fixed;
+      bottom:-40px;
       font-size:24px;
-      animation: floatUp linear forwards;
       pointer-events:none;
       z-index:1;
+      animation: floatUp linear forwards;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.12));
     }
     @keyframes floatUp{
-      0% { transform: translateY(20px); opacity:0; }
-      10% { opacity:1; }
-      100% { transform: translateY(-120vh); opacity:0; }
+      0%   { transform: translateY(0) scale(.9) rotate(0deg); opacity:0; }
+      10%  { opacity:1; }
+      100% { transform: translateY(-120vh) scale(1.35) rotate(25deg); opacity:0; }
     }
   </style>
 </head>
 
 <body>
-
   <div class="card" id="card">
     <img class="img"
          src="https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=1200&q=80"
          alt="Image mignonne" />
 
-    <h1>Marine, la plus belle femme du monde, veux-tu être ma Valentine ? 💘</h1>
-    <p>(Clique pas sur non stp 😏)</p>
+    <h1>Marine, veux-tu être ma Valentine ? 💘</h1>
+    <p>(Tu n’as qu’un seul vrai choix 😏)</p>
 
-    <div class="buttons" id="btnZone">
+    <div class="buttons" id="zone">
       <button id="yes">OUI !!!</button>
       <button id="no">non</button>
     </div>
@@ -101,54 +105,99 @@
     <div id="message">Hmmm… quel cadeau j’ai bien pu te faire 😏</div>
   </div>
 
-  <audio id="loveSong">
+  <audio id="loveSong" preload="auto">
     <source src="love-to-love.mp3" type="audio/mpeg">
   </audio>
 
   <script>
+    const zone = document.getElementById('zone');
     const noBtn = document.getElementById('no');
     const yesBtn = document.getElementById('yes');
-    const message = document.getElementById('message');
+    const msg = document.getElementById('message');
     const song = document.getElementById('loveSong');
 
-    // NON qui fuit
-    document.addEventListener('mousemove', e => {
-      const rect = noBtn.getBoundingClientRect();
-      const distance = Math.hypot(
-        e.clientX - rect.left,
-        e.clientY - rect.top
-      );
+    // --- NON qui fuit mais reste DANS la zone ---
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
 
-      if(distance < 120){
-        const x = Math.random() * (window.innerWidth - 100);
-        const y = Math.random() * (window.innerHeight - 100);
-        noBtn.style.left = x + "px";
-        noBtn.style.top = y + "px";
-      }
-    });
+    function dodge(e){
+      const z = zone.getBoundingClientRect();
+      const b = noBtn.getBoundingClientRect();
 
-    // coeurs
-    function spawnHearts(){
-      for(let i=0;i<40;i++){
-        const heart = document.createElement('div');
-        heart.className = 'heart';
-        heart.innerText = "❤️";
-        heart.style.left = Math.random()*100 + "vw";
-        heart.style.bottom = "-20px";
-        heart.style.animationDuration = (2 + Math.random()*2) + "s";
-        document.body.appendChild(heart);
-        setTimeout(()=>heart.remove(),4000);
+      const mx = e.clientX - z.left;
+      const my = e.clientY - z.top;
+
+      const bx = (b.left - z.left) + b.width/2;
+      const by = (b.top  - z.top)  + b.height/2;
+
+      const dx = bx - mx;
+      const dy = by - my;
+      const dist = Math.hypot(dx, dy);
+
+      const trigger = 120;
+      if(dist < trigger){
+        const push = (trigger - dist) * 2.0;
+        const angle = Math.atan2(dy, dx) + (Math.random()-0.5)*0.7;
+
+        // position actuelle (par rapport à la zone)
+        const curL = parseFloat(getComputedStyle(noBtn).left);
+        const curT = parseFloat(getComputedStyle(noBtn).top);
+
+        let newL = curL + Math.cos(angle)*push;
+        let newT = curT + Math.sin(angle)*push;
+
+        const pad = 6;
+        const maxL = z.width  - noBtn.offsetWidth  - pad;
+        const maxT = z.height - noBtn.offsetHeight - pad;
+
+        newL = clamp(newL, pad, maxL);
+        newT = clamp(newT, pad, maxT);
+
+        noBtn.style.left = newL + "px";
+        noBtn.style.top  = newT + "px";
       }
     }
 
-    // click oui
-    yesBtn.addEventListener('click', () => {
-      message.style.display = 'block';
+    // Fuit au survol et au mouvement dans la zone
+    noBtn.addEventListener('mouseenter', dodge);
+    zone.addEventListener('mousemove', dodge);
+    noBtn.addEventListener('click', (e)=> e.preventDefault());
+
+    // --- Hearts ---
+    function createHeart(){
+      const h = document.createElement('div');
+      h.className = 'heart';
+      h.textContent = Math.random()<0.2 ? '💖' : (Math.random()<0.4 ? '💘' : '❤️');
+      h.style.left = (Math.random()*100) + "vw";
+      h.style.fontSize = (18 + Math.random()*26) + "px";
+      const dur = 2200 + Math.random()*2200;
+      h.style.animationDuration = dur + "ms";
+      document.body.appendChild(h);
+      setTimeout(()=>h.remove(), dur+200);
+    }
+
+    function heartsBurst(ms=3200, rate=70){
+      const start = performance.now();
+      const interval = 1000/rate;
+      const t = setInterval(()=>{
+        if(performance.now()-start > ms){ clearInterval(t); return; }
+        createHeart();
+      }, interval);
+    }
+
+    // --- OUI ---
+    yesBtn.addEventListener('click', async ()=>{
+      msg.style.display = 'block';
       noBtn.style.display = 'none';
-      spawnHearts();
-      song.play();
+      yesBtn.textContent = "OUIIIII 😍";
+      heartsBurst(3500, 75);
+
+      try{
+        song.volume = 0.8;
+        await song.play();
+      }catch(err){
+        console.log("Audio bloqué:", err);
+      }
     });
   </script>
-
 </body>
 </html>
